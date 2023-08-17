@@ -52,7 +52,7 @@ float getDepth(vec2 where)
 
 float getDepth(vec2 where, float lod)
 {
-    //TODO Gauss  dl(P) depth map 
+    //TODO Gauss  dl(P) depth map
     return textureLod(depthTex, where, lod).r;
 }
 
@@ -218,15 +218,14 @@ float computeLineAO(vec2 coord){
 
             //spielt Rolle bei brightness:
             //diffuse reflected light
-                    //#ifdef OccluderLight
-                    vec3 t= getTangent( hemispherePoint.xy, lod ).xyz;
-                    vec3 newnorm = normalize( cross( normalize( cross( t, normalize( hemisphereVector ) ) ), t ) );
-                    float occluderDiffuse = max( dot( newnorm, lightPos.xyz ), 0.0);
-
-                    //#else
+            //#ifdef OccluderLight
+            //vec3 t= getTangent( hemispherePoint.xy, lod ).xyz;
+            //vec3 newnorm = normalize( cross( normalize( cross( t, normalize( hemisphereVector ) ) ), t ) );
+            //float occluderDiffuse = max( dot( newnorm, lightPos.xyz ), 0.0);
+            //#else
 
             //disable effect
-            //float occluderDiffuse = 0.0;
+            float occluderDiffuse = 0.0;
             //#endif
 
 
@@ -235,7 +234,7 @@ float computeLineAO(vec2 coord){
             float occluderSpecular = pow( max( dot( H, occluderNormal ), 0.0 ), 100.0);
 
             normalDifference = pointDiffuse * ( occluderSpecular + occluderDiffuse );
-            normalDifference= 1.5 - normalDifference;
+            normalDifference = 1.5 - normalDifference;
 
 
             //shadowiness
@@ -277,7 +276,7 @@ void main(){
     def render(self,image):
         # update texture
         self.rgbaTex.write(image.channels['rgba'].tobytes())
-        #self.depthTex.write(image.channels['depth'].tobytes())
+        self.depthTex.write(image.channels['depth'].tobytes())
 
         # render
         self.fbo.clear(0.0, 0.0, 0.0, 1.0)
@@ -334,7 +333,7 @@ void main(){
         self.program['samples'].value = int(self.inputs.samples.get())
         self.program['scalers'].value = int(self.inputs.scalers.get())
         self.program['resolution'].value = res
-        
+
 
 
 
@@ -350,9 +349,9 @@ void main(){
 
 
         for image in images:
-            
+
             results.append( self.render(image) )
-            
+
 
 
         self.rgbaTex.release()
