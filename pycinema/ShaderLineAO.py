@@ -1,16 +1,15 @@
 from .Shader import *
-#import cv2
-#import numpy
+import cv2
+import numpy
 
 # TODO: actually implement the shader, change the parameters to the ones we need
 class ShaderLineAO(Shader):
     def __init__(self):
         super().__init__(['rgbaTex','depthTex', 'noiseTex'])
         self.addInputPort("images", [])
-        self.addInputPort("radius", 2.0)
+        self.addInputPort("radius", 1.5)
         self.addInputPort("samples", 32)
         self.addInputPort("scalers", 3)
-
         self.addOutputPort("images", [])
 
     def getFragmentShaderCode(self):
@@ -29,13 +28,8 @@ uniform int scalers;
 
 //uniform int currentLevel;
 
-//uniform sampler2D noiseTex;
-
 //for zoom function
 uniform float lineWidth = 2.0;
-
-//gaussian pyramid
-uniform int pyramidLevels;
 
 float radiusSS = radius;
 
@@ -51,24 +45,15 @@ out vec4 color;
 
 //depth
 
-float getDepth(vec2 where, float lod)
+float getDepth(vec2 where)
 {
     return texture(depthTex, where).r;
 }
 
-float getDepth(vec2 where)
+float getDepth(vec2 where, float lod)
 {
-    return getDepth(where, 0.0);
-}
-
-float getDepth(float lod)
-{
-    return getDepth(uv, lod);
-}
-
-float getDepth()
-{
-    return getDepth(0.0);
+    //TODO Gauss  dl(P) depth map 
+    return textureLod(depthTex, where, lod).r;
 }
 
 //for randNormal
@@ -80,25 +65,7 @@ vec2 getTextureSize(sampler2D texture)
 
 
 //Normal
-vec3 getNormal(vec2 uv) {
-    // Lies die Farbe aus der Normal Map
-    vec3 colortex = texture(rgbaTex, uv).rgb;
-
-    // Transformiere die Farbe von [0,1] auf [-1,1]
-    vec3 normal = colortex * 2.0 - 1.0 ;
-
-    return normalize(normal);
-}
-
-vec3 getNormal(vec2 uv, float lod) {
-    // Lies die Farbe aus der Normal Map
-    vec3 colortex = texture(rgbaTex, uv).rgb;
-
-    // Transformiere die Farbe von [0,1] auf [-1,1]
-    vec3 normal = colortex * 2.0 - 1.0 - lod;
-
-    return normalize(normal);
-}
+//TODO Normale für Gauss
 
 vec3 computeNormal(in vec2 uv, in float depth){
   vec2 pixelSize = 1./resolution;
@@ -125,7 +92,16 @@ float getZoom()
     return texture( rgbaTex, uv ).r;
 }
 
+vec3 getTangent(vec2 hemispherePoint, float lod) {
+    // Berechnen von z basierend auf x und y
+    float z = sqrt(1.0 - hemispherePoint.x * hemispherePoint.x - hemispherePoint.y * hemispherePoint.y);
 
+    // LOD eingefügen
+    // ...
+
+    // Rückgabe des Tangentenvektors
+    return vec3(hemispherePoint.x, hemispherePoint.y, z);
+}
 
 ///////////////////////////////////////////
 //  LineAO
@@ -146,7 +122,7 @@ float computeLineAO(vec2 coord){
 
 
     //random normal for reflecting sample rays
-    vec2 noiseSize = getTextureSize(rgbaTex);
+    vec2 noiseSize = getTextureSize(noiseTex);
     //vec2 randCoordsNorm = coord * noiseSize.x;
     //vec3 randNormal = vec3(fract(sin(dot(randCoordsNorm, vec2(12.9898, 78.233))) * 43758.5453),
     //                    fract(sin(dot(randCoordsNorm, vec2(23.123, 45.678))) * 98365.1234),
@@ -229,8 +205,10 @@ float computeLineAO(vec2 coord){
             float lod = 0.0;
 
             //gausspyramid for Level of Detail
+            //lod = float(l);
 
-            occluderDepth = getDepth( hemispherePoint.xy);
+            //occluderDepth = getDepth( hemispherePoint.xy, lod );
+            occluderDepth = getDepth( hemispherePoint.xy );
             //occluderNormal = getNormal( hemispherePoint.xy).xyz;
             occluderNormal = computeNormal( hemispherePoint.xy, occluderDepth).xyz;
             depthDifference = currentPixelDepth - occluderDepth;
@@ -241,14 +219,14 @@ float computeLineAO(vec2 coord){
             //spielt Rolle bei brightness:
             //diffuse reflected light
                     //#ifdef OccluderLight
-                    //vec3 t= getTangent( hemispherePoint.xy, lod ).xyz;
-                    //vec3 newnorm = normalize( cross( normalize( cross( t, normalize( hemisphereVector ) ) ), t ) );
-                    //float occluderDiffuse = max( dot( newnorm, lightPos.xyz ), 0.0);
+                    vec3 t= getTangent( hemispherePoint.xy, lod ).xyz;
+                    vec3 newnorm = normalize( cross( normalize( cross( t, normalize( hemisphereVector ) ) ), t ) );
+                    float occluderDiffuse = max( dot( newnorm, lightPos.xyz ), 0.0);
 
                     //#else
 
             //disable effect
-            float occluderDiffuse = 0.0;
+            //float occluderDiffuse = 0.0;
             //#endif
 
 
@@ -311,21 +289,21 @@ void main(){
 
         return outImage
 
-#    def downsample(self,image):
+    # def downsample(self,image):
         image_data= numpy.array(image)
         # Verkleinert das Bild auf die Hälfte seiner Größe
         return cv2.pyrDown(image_data)
 
-#    def create_gaussian_pyramid(self, image, levels):
-        pyramid = [image]
+    # def create_gaussian_pyramid(self, image, levels):
+        highres = image.copy()
+        pyramid = [highres]
         for i in range(levels):
-            current_level = i  # Setzen Sie dies auf das aktuelle Level Ihrer Gauß-Pyramide
-            self.program['currentLevel'].value = current_level
-            # Glätte das Bild mit dem Shader
-            smoothed_image = self.render(pyramid[-1])
+            # aktuelle Level Gauß-Pyramide
+            self.program['currentLevel'].value = i
             # Skaliere das Bild herunter
-            downsampled_image = self.downsample(smoothed_image)
-            pyramid.append(downsampled_image)
+            lowres = cv2.pyrDown(highres)
+            highres = cv2.pyrUp(lowres)
+            pyramid.append(highres)
         return pyramid
 
     def _update(self):
@@ -356,6 +334,7 @@ void main(){
         self.program['samples'].value = int(self.inputs.samples.get())
         self.program['scalers'].value = int(self.inputs.scalers.get())
         self.program['resolution'].value = res
+        
 
 
 
@@ -363,14 +342,17 @@ void main(){
         # create textures
         self.rgbaTex = self.createTexture(0,res,shape[2],dtype='f1')
         self.depthTex = self.createTexture(1,res,1,dtype='f4')
-        self.noiseTex = self.createNoiseTexture(2, res, 3)
+        self.noiseTex = self.createNoiseTexture(2, (64,64), 3)
 
 
-        #self.create_gaussian_pyramid(images, 8)
+        # TODO richtig einbinden
+        # images = self.create_gaussian_pyramid(images,4)
 
 
         for image in images:
+            
             results.append( self.render(image) )
+            
 
 
         self.rgbaTex.release()
