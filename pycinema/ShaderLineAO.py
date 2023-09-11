@@ -9,7 +9,9 @@ class ShaderLineAO(Shader):
         self.addInputPort("images", [])
         self.addInputPort("radius", 1.5)
         self.addInputPort("samples", 32)
-        self.addInputPort("scalers", 3)
+        self.addInputPort("scalers", 5)
+        self.addInputPort("densityweight",1.0)
+        self.addInputPort("totalStrength",1.0)
         self.addOutputPort("images", [])
 
     def getFragmentShaderCode(self):
@@ -25,6 +27,7 @@ uniform float diff_area;
 uniform int samples;
 uniform vec2 resolution;
 uniform int scalers;
+uniform float densityweight;
 
 //uniform int currentLevel;
 
@@ -35,7 +38,7 @@ float radiusSS = radius;
 
 
 //influence of SSAO
-uniform float totalStrength = 1.0;
+uniform float totalStrength;
 
 
 in vec2 uv;
@@ -50,12 +53,6 @@ float getDepth(vec2 where)
     return texture(depthTex, where).r;
 }
 
-float getDepth(vec2 where, float lod)
-{
-    //TODO Gauss  dl(P) depth map
-    return textureLod(depthTex, where, lod).r;
-}
-
 //for randNormal
 vec2 getTextureSize(sampler2D texture)
 {
@@ -65,7 +62,6 @@ vec2 getTextureSize(sampler2D texture)
 
 
 //Normal
-//TODO Normale für Gauss
 
 vec3 computeNormal(in vec2 uv, in float depth){
   vec2 pixelSize = 1./resolution;
@@ -87,34 +83,16 @@ vec3 computeNormal(in vec2 uv, in float depth){
   return normalize(cross(dx, dy));
 }
 
-float getZoom()
-{
-    return texture( rgbaTex, uv ).r;
-}
 
-vec3 getTangent(vec2 hemispherePoint, float lod) {
-    // Berechnen von z basierend auf x und y
-    float z = sqrt(1.0 - hemispherePoint.x * hemispherePoint.x - hemispherePoint.y * hemispherePoint.y);
 
-    // LOD eingefügen
-    // ...
+//   based on Opensource code for LineAO on Openwalnut
 
-    // Rückgabe des Tangentenvektors
-    return vec3(hemispherePoint.x, hemispherePoint.y, z);
-}
-
-///////////////////////////////////////////
-//  LineAO
-//////////////////////////////////////////
 float computeLineAO(vec2 coord){
 
 
     vec4 rgba = texture(rgbaTex,coord);
 
     vec3 lightPos = vec3(0,10,10);
-
-
-    //openwalnut
 
     // Fall-off for SSAO per occluder
     const float falloff = 0.00001;
@@ -123,6 +101,7 @@ float computeLineAO(vec2 coord){
 
     //random normal for reflecting sample rays
     vec2 noiseSize = getTextureSize(noiseTex);
+
     //vec2 randCoordsNorm = coord * noiseSize.x;
     //vec3 randNormal = vec3(fract(sin(dot(randCoordsNorm, vec2(12.9898, 78.233))) * 43758.5453),
     //                    fract(sin(dot(randCoordsNorm, vec2(23.123, 45.678))) * 98365.1234),
@@ -133,7 +112,6 @@ float computeLineAO(vec2 coord){
 
 
     //current pixels normal and depth
-    //vec3 currentPixelSample = getNormal( coord ).xyz;
     float currentPixelDepth = getDepth( coord );
     vec3 currentPixelSample = computeNormal( coord, getDepth(coord) ).xyz;
 
@@ -143,11 +121,10 @@ float computeLineAO(vec2 coord){
     //normal of current fragment
     vec3 normal = currentPixelSample.xyz;
 
-    //invariant for zooming
-
     float maxPixels = max( float( resolution.x ), float( resolution.y ) );
-    //radiusSS = ( getZoom() * radius / maxPixels ) / (1.0 - currentPixelDepth );
-    radiusSS = ( radius / maxPixels ) / (1.0 - currentPixelDepth );
+    radiusSS = ( radius * radius  / maxPixels  ) / (1.0 - currentPixelDepth );
+
+    
 
     //some temoraries needed inside the loop
     vec3 ray;
@@ -167,7 +144,7 @@ float computeLineAO(vec2 coord){
         float occlusionStep = 0.0;
 
         //diffrent from paper
-        radiusScaler += 1.5 + l;
+        radiusScaler += radius + l;
 
         //get samples and check for Occluders
         int numSamplesAdded = 0;
@@ -202,52 +179,33 @@ float computeLineAO(vec2 coord){
             //count Samples used
             numSamplesAdded++;
 
-            float lod = 0.0;
-
-            //gausspyramid for Level of Detail
-            //lod = float(l);
-
-            //occluderDepth = getDepth( hemispherePoint.xy, lod );
+            
             occluderDepth = getDepth( hemispherePoint.xy );
-            //occluderNormal = getNormal( hemispherePoint.xy).xyz;
             occluderNormal = computeNormal( hemispherePoint.xy, occluderDepth).xyz;
             depthDifference = currentPixelDepth - occluderDepth;
 
             //difference between the normals as a weight -> how much occludes fragment
-            float pointDiffuse = max( dot( hemisphereVector, normal ), 0.0 );
-
-            //spielt Rolle bei brightness:
-            //diffuse reflected light
-            //#ifdef OccluderLight
-            //vec3 t= getTangent( hemispherePoint.xy, lod ).xyz;
-            //vec3 newnorm = normalize( cross( normalize( cross( t, normalize( hemisphereVector ) ) ), t ) );
-            //float occluderDiffuse = max( dot( newnorm, lightPos.xyz ), 0.0);
-            //#else
-
-            //disable effect
-            float occluderDiffuse = 0.0;
-            //#endif
+            float pointDiffuse = max( dot( hemisphereVector, normal ), 0.0 );         
 
 
             //specular reflection
             vec3 H = normalize( lightPos.xyz + normalize( hemisphereVector ) );
             float occluderSpecular = pow( max( dot( H, occluderNormal ), 0.0 ), 100.0);
 
-            normalDifference = pointDiffuse * ( occluderSpecular + occluderDiffuse );
+            normalDifference = pointDiffuse *  occluderSpecular ;
             normalDifference = 1.5 - normalDifference;
 
 
             //shadowiness
 
             float SCALER = 1.0 - ( l / (float (scalers - 1.0 ) ) );
-            float densityInfluence = SCALER * SCALER;
+            float densityInfluence = SCALER * SCALER * densityweight;
 
-            float densityWeight = 1.0 - smoothstep( falloff, densityInfluence, depthDifference );
+            float lineDensityWeight = 1.0 - smoothstep( falloff, densityInfluence, depthDifference );
 
 
             // reduce occlusion if occluder is far away
-            occlusionStep += normalDifference * densityWeight * step( falloff, depthDifference );
-            //occlusionStep = 0.0;
+            occlusionStep += normalDifference * lineDensityWeight * step( falloff, depthDifference );
         }
 
         occlusion += ( 1.0 / float( numSamplesAdded ) ) * occlusionStep;
@@ -265,10 +223,8 @@ void main(){
     vec4 rgba = texture(rgbaTex, uv);
     float c = computeLineAO(uv);
 
-    //color = vec4(c, rgba.a);
     color = vec4(mix( vec3(0), rgba.rgb, c), rgba.a);
-    //color = vec4(rgba.rgb*c, rgba.a);
-    //color = vec4(vec3(rgba.rgb*c), 1.0);
+
 }
 
 """
@@ -332,24 +288,18 @@ void main(){
         self.program['radius'].value = float(self.inputs.radius.get())
         self.program['samples'].value = int(self.inputs.samples.get())
         self.program['scalers'].value = int(self.inputs.scalers.get())
+        self.program['densityweight'].value = int(self.inputs.densityweight.get())
+        self.program['totalStrength'].value = int(self.inputs.totalStrength.get())
         self.program['resolution'].value = res
-
-
-
 
 
         # create textures
         self.rgbaTex = self.createTexture(0,res,shape[2],dtype='f1')
         self.depthTex = self.createTexture(1,res,1,dtype='f4')
-        self.noiseTex = self.createNoiseTexture(2, (64,64), 3)
-
-
-        # TODO richtig einbinden
-        # images = self.create_gaussian_pyramid(images,4)
+        self.noiseTex = self.createNoiseTexture(2, res, 3)
 
 
         for image in images:
-
             results.append( self.render(image) )
 
 
