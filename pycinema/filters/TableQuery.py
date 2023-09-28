@@ -33,10 +33,7 @@ class TableQuery(Filter):
         for i in range(0,len(header)):
             if header[i].lower()=='id':
                 continue
-            if isNumber(firstRow[i]):
-                sql += ', ' + header[i] + ' REAL';
-            else:
-                sql += ', ' + header[i] + ' TEXT';
+            sql = sql + ', ' + header[i] + ' TEXT';
         sql =  sql + ')';
         self.executeSQL(db,sql)
 
@@ -49,7 +46,7 @@ class TableQuery(Filter):
         for i in range(1, len(table)):
             row = '('
             for v in table[i]:
-              row += '"' + str(v) + '",'
+                row += '"' + str(v) + '",'
             sql += row[0:-1] + '),\n'
         sql = sql[0:-2];
         self.executeSQL(db,sql)

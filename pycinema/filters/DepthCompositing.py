@@ -1,7 +1,6 @@
 from pycinema import Filter
 
 import numpy
-import re
 
 class DepthCompositing(Filter):
 
@@ -41,10 +40,8 @@ class DepthCompositing(Filter):
         return [data]
 
     def getKeys(self,image,compose):
-        if compose[0]==None:
-            return image.meta.keys()
-        ignore = [compose[0]] + ['id','file']
-        return [p for p in image.meta.keys() if not any([re.search(i, p, re.IGNORECASE) for i in ignore])]
+        compose = [compose[0]] + ['id','file']
+        return list(filter(lambda m: m not in compose, image.meta))
 
     def getTupleKey(self,image,keys):
         meta_keys = [self.toList(image.meta[m]) for m in keys]
@@ -76,8 +73,9 @@ class DepthCompositing(Filter):
         #     return set([tuple([data])])
 
     def compose(self,A,B,depthChannel):
+
         result = A.copy()
-        mask = A.getChannel(depthChannel) > B.getChannel(depthChannel)
+        mask = A.channels[depthChannel] > B.channels[depthChannel]
 
         for c in A.channels:
             if c not in B.channels:
@@ -88,8 +86,10 @@ class DepthCompositing(Filter):
             result.channels[c] = data
 
         for m in B.meta:
+            print(m)
             if m not in A.meta:
                 result.meta[m] = b.meta[m]
+            print('x',m)
 
         for m in A.meta:
             if m in B.meta:
@@ -133,12 +133,10 @@ class DepthCompositing(Filter):
             keys = self.getKeys(imagesA[0],metaCompositing)
 
             # check if depth channel exists on all images
-            try:
-                for i in imagesA:
-                    i.getChannel(depthChannel)
-            except:
-              self.outputs.images.set(imagesA)
-              return 1
+            for i in imagesA:
+              if not depthChannel in i.channels:
+                self.outputs.images.set(imagesA)
+                return 1
 
             for i in imagesA:
                 key = self.getTupleKey(i,keys)

@@ -443,7 +443,7 @@ class ParallelCoordinatesView(Filter, FilterView):
         self,
         inputs={
           'table': [[]],
-          'ignore': ['^file','^id'],
+          'ignore': ['file','id'],
           'state': {}
         },
         outputs={
@@ -480,6 +480,7 @@ class ParallelCoordinatesView(Filter, FilterView):
         self.outputs.sql.set('SELECT * FROM input')
         return 1
 
+      ignore = self.inputs.ignore.get()
       ignore = self.inputs.ignore.get()
       header = [(p,idx) for idx,p in enumerate(table[0]) if not any([re.search(i, p, re.IGNORECASE) for i in ignore])]
       header.sort()

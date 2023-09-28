@@ -15,7 +15,8 @@ class _ImageViewer(QtWidgets.QGraphicsView):
         self.setResizeAnchor(QtWidgets.QGraphicsView.AnchorUnderMouse)
         self.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
         self.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
-        self.setSceneRect(-1,-1,1,1)
+        l = 10000
+        self.setSceneRect(-l,-l,2*l,2*l)
 
         self._scene = QtWidgets.QGraphicsScene(self)
         self.setScene(self._scene)
@@ -30,7 +31,7 @@ class _ImageViewer(QtWidgets.QGraphicsView):
     def addImage(self,image,x,y):
         item = QtWidgets.QGraphicsPixmapItem()
 
-        rgba = image.getChannel('rgba')
+        rgba = image.channels['rgba']
         qimage = QtGui.QImage(
           rgba,
           rgba.shape[1], rgba.shape[0],
@@ -101,8 +102,8 @@ class ImageView(Filter, FilterView):
         max_h = 0
         images = self.inputs.images.get()
         for image in images:
-          max_w = max(image.shape[1],max_w)
-          max_h = max(image.shape[0],max_h)
+          max_w = max(image.shape[0],max_w)
+          max_h = max(image.shape[1],max_h)
         max_w += 5
         max_h += 5
 
@@ -110,15 +111,9 @@ class ImageView(Filter, FilterView):
         nRows = int(numpy.floor(numpy.sqrt(n)))
         nCols = int(numpy.ceil(n/nRows))
 
-        total_h = 4*nRows*max_h
-        total_w = 4*nCols*max_w
-        self.view.setSceneRect(-total_w,-total_h,2*total_w,2*total_h)
-
         for i, image in enumerate(images):
           r = numpy.floor(i/nCols)
           c = i-r*nCols
           self.view.addImage(image,c*max_w,r*max_h)
-
-        self.view.fitInView()
 
         return 1

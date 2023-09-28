@@ -72,7 +72,7 @@ class ParameterView(Filter, FilterView):
           self,
           inputs={
             'table': [[]],
-            'ignore': ['^file','^id'],
+            'ignore': ['file','id'],
             'state': {}
           },
           outputs={

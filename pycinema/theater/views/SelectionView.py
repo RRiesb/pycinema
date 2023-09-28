@@ -4,8 +4,7 @@ from pycinema.theater.View import View
 
 from pycinema.theater import views
 from pycinema.theater.views.FilterView import FilterView
-from pycinema.theater.views.NodeEditorView import NodeEditorView
-import re
+from pycinema.theater.views.NodeView import NodeView
 
 class SelectionButton(QtWidgets.QPushButton):
   def __init__(self,name,parent,cls):
@@ -25,9 +24,9 @@ class SelectionView(View):
 
     view_list = [cls for name, cls in views.__dict__.items() if isinstance(cls,type) and issubclass(cls,FilterView) and name!='FilterView']
     view_list.sort(key=lambda x: x.__name__)
-    view_list.insert(0,NodeEditorView)
+    view_list.insert(0,NodeView)
 
     for cls in view_list:
-      self.layout().addWidget( SelectionButton(re.sub(r'(\w)([A-Z])', r'\1 \2', cls.__name__.replace('View','')), self, cls) )
+      self.layout().addWidget( SelectionButton(cls.__name__, self, cls) )
 
     self.layout().addWidget(QtWidgets.QLabel(),1)

@@ -15,7 +15,7 @@ class ImageAnnotation(Filter):
             'size': 20,
             'spacing': 0,
             'color': (),
-            'ignore': ['^file','^id'],
+            'ignore': ['file','id']
           },
           outputs={
             'images': []

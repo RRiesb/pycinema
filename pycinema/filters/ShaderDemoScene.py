@@ -179,6 +179,8 @@ void main() {
 
     def render(self,phi,theta,time,objects_meta):
 
+        Shader.fbo.clear(0.0, 0.0, 0.0, 1.0)
+
         phi_rad = phi/360.0*2.0*numpy.pi
         theta_rad = (90-theta)/180.0*numpy.pi
 
@@ -187,8 +189,6 @@ void main() {
         self.program['iTime'].value = time
         self.program['iPhi'].value = phi_rad
         self.program['iTheta'].value = theta_rad
-
-        self.fbo.clear(0.0, 0.0, 0.0, 1.0)
         self.vao.render(moderngl.TRIANGLE_STRIP)
 
         # create output image

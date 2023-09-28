@@ -5,5 +5,5 @@ from .ParameterView import ParameterView
 from .SelectionView import SelectionView
 from .TableView import TableView
 from .ParallelCoordinatesView import ParallelCoordinatesView
-from .NodeEditorView import NodeEditorView
+from .NodeView import NodeView
 from .InspectorView import InspectorView

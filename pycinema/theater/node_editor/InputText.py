@@ -54,8 +54,6 @@ class InputText(QtWidgets.QWidget):
             self.layout().addWidget(self.label,1)
 
     def setValue(self,text):
-        if self.edit.isReadOnly(): return
-
         v = None
         try:
             if self.port.type==str:

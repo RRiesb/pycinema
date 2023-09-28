@@ -6,8 +6,8 @@ class ShaderPointAO(Shader):
           inputs={
             'images': [],
             'radius': 1.5,
-            'samples': 32,
-            'scalers': 3,
+            'samples': 60,
+            'scalers': 2,
             'densityweight': 1.0,
             'totalStrength': 1.0
           },
@@ -31,11 +31,6 @@ uniform int samples;
 uniform vec2 resolution;
 uniform int scalers;
 uniform float densityweight;
-
-//uniform int currentLevel;
-
-//for zoom function
-uniform float lineWidth = 2.0;
 
 float radiusSS = radius;
 
@@ -168,10 +163,10 @@ float computePointAO(vec2 coord){
 
             vec3 randSphereNormal = ( texture( noiseTex, vec2( float( i ) / float( samples ), float( l + 1 ) / float( scalers ) ) ).rgb * 2.0 ) - vec3( 1.0 );
 
-            //radius corresponds to (1 / (1 - dj(P))) * r_0 * (j^2 + j * r_0)
+            //radius corresponds to (1 / (1 - dj(P))) * (j^2 + j * r_0)
             float depthScaling = 1.0 / (1.0 - currentPixelDepth);
             float distanceLevelScaling = (l * l + l * radius);
-            radiusSS = depthScaling * radius * distanceLevelScaling / maxPixels;
+            radiusSS = depthScaling * distanceLevelScaling / maxPixels;
 
             vec3 hemisphereVector = reflect( randSphereNormal, randNormal );
             ray = radiusScaler * radiusSS * hemisphereVector;
@@ -241,22 +236,10 @@ void main(){
 
 """
 
-    def create_noise_texture(self, resolution):
-        noise_data = numpy.random.rand(resolution[0], resolution[1], 3)
-        noise_data = (noise_data * 255).astype(numpy.uint8)
-        self.noise_data = noise_data
-        self.noise_data_resolution = resolution
-
     def render(self,image):
-        # update framebuffer and textures
-        self.initFramebuffer(image.resolution)
-        self.updateTexture(0,image.getChannel('rgba'))
-        self.updateTexture(1,image.getChannel('depth'))
-        if self.noise_data_resolution != image.resolution:
-            self.create_noise_texture(image.resolution)
-        self.updateTexture(2,self.noise_data,True)
-
-        self.program['resolution'].value = image.resolution
+        # update texture
+        self.rgbaTex.write(image.channels['rgba'].tobytes())
+        self.depthTex.write(image.channels['Depth'].tobytes())
 
         # render
         self.fbo.clear(0.0, 0.0, 0.0, 1.0)
@@ -270,7 +253,25 @@ void main(){
 
     def _update(self):
         results = []
+
         images = self.inputs.images.get()
+        if len(images)<1:
+            self.outputs.images.set(results)
+            return 1
+
+        # first image
+        image0 = images[0]
+        if not 'Depth' in image0.channels or not 'rgba' in image0.channels:
+            self.outputs.images.set(images)
+            return 1
+
+        shape = image0.channels['rgba'].shape
+        if len(shape)!=3:
+            shape = (shape[0],shape[1],1)
+        res = shape[:2][::-1]
+
+        # init framebuffer
+        self.initFramebuffer(res)
 
         # set uniforms
         self.program['radius'].value = float(self.inputs.radius.get())
@@ -278,14 +279,25 @@ void main(){
         self.program['scalers'].value = int(self.inputs.scalers.get())
         self.program['densityweight'].value = int(self.inputs.densityweight.get())
         self.program['totalStrength'].value = int(self.inputs.totalStrength.get())
+        self.program['resolution'].value = res
+
+        # create textures
+        self.rgbaTex = self.createTexture(0,res,shape[2],dtype='f1')
+        self.depthTex = self.createTexture(1,res,1,dtype='f4')
+        self.noiseTex = self.createTexture(2,res,3,dtype='f1')
+
+        # init noise texture
+        noise_data = numpy.random.rand(res[0], res[1], 3)
+        noise_data = (noise_data * 255).astype(numpy.uint8).tobytes()
+        self.noiseTex.write(noise_data)
 
         # render images
-        try:
-          for image in images:
-              results.append( self.render(image) )
-        except:
-          self.outputs.images.set(images)
-          return 1
+        for image in images:
+            results.append( self.render(image) )
+
+        self.rgbaTex.release()
+        self.depthTex.release()
+        self.noiseTex.release()
 
         self.outputs.images.set(results)
 

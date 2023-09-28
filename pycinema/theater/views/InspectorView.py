@@ -27,7 +27,7 @@ class InspectorView(Filter, FilterView):
         self.content.layout().addWidget(self.editor)
 
     def _update(self):
-        x = pprint.pformat(self.inputs.object.get(), indent=2)
+        x = pprint.pformat(self.inputs.object.get(), indent=4)
         self.editor.setText(x)
         # self.editor.setText(str(self.inputs.object.get()))
         return 1

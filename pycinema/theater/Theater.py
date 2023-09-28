@@ -1,11 +1,10 @@
 from PySide6 import QtCore, QtWidgets, QtGui
-from PySide6.QtWidgets import QMessageBox
 
 import pycinema
 from pycinema.theater import View
 from pycinema.theater.ViewFrame import *
 from pycinema.theater.FilterBrowser import *
-from pycinema.theater.views.NodeEditorView import *
+from pycinema.theater.views.NodeView import *
 from pycinema.theater.Icons import Icons
 from pycinema.theater.node_editor.NodeEditorStyle import NodeEditorStyle
 
@@ -18,67 +17,37 @@ class _Theater(QtWidgets.QMainWindow):
         # init theme
         Icons.update_theme();
         NodeEditorStyle.update_theme();
-        ViewStyle.update_theme();
 
-        # make actions
-        button_viewCDB = QtGui.QAction("Open Cinema database ...", self)
+        toolbar = QtWidgets.QToolBar("My main toolbar")
+        self.addToolBar(toolbar)
+
+        button_viewCDB = QtGui.QAction("Open", self)
         button_viewCDB.setStatusTip("open local cinema database")
         button_viewCDB.triggered.connect(self.viewCDB)
+        toolbar.addAction(button_viewCDB)
 
-        button_save = QtGui.QAction("Save script ...", self)
+        button_save = QtGui.QAction("Save", self)
         button_save.setStatusTip("save script")
         button_save.triggered.connect(self.saveScript)
+        toolbar.addAction(button_save)
 
-        button_load = QtGui.QAction("Load script ...", self)
+        button_load = QtGui.QAction("Load", self)
         button_load.setStatusTip("load script")
         button_load.triggered.connect(self.loadScript)
+        toolbar.addAction(button_load)
 
-        button_filters = QtGui.QAction("Add filter ...", self)
+        button_filters = QtGui.QAction("Filters", self)
         button_filters.setStatusTip("Open Filter Browser")
         button_filters.triggered.connect(self.showFilterBrowser)
+        toolbar.addAction(button_filters)
 
         button_reset = QtGui.QAction("Reset", self)
         button_reset.setStatusTip("Reset Theater")
         button_reset.triggered.connect(self.reset)
-
-        button_about = QtGui.QAction("About ...", self)
-        button_about.setStatusTip("About Cinema")
-        button_about.triggered.connect(self.about)
-
-        button_quit = QtGui.QAction("Quit Cinema", self)
-        button_quit.setStatusTip("Quit Cinema")
-        button_quit.triggered.connect(self.quit)
-
-        # menu
-        menuBar = self.menuBar();
-        menuBar.setNativeMenuBar(False)
-        cinemaMenu = menuBar.addMenu("Cinema")
-        cinemaMenu.addAction(button_about)
-        cinemaMenu.addAction(button_quit)
-        fileMenu = menuBar.addMenu("&File")
-        fileMenu.addAction(button_viewCDB)
-        fileMenu.addAction(button_load)
-        fileMenu.addAction(button_save)
-        fileMenu.addSeparator()
-        fileMenu.addAction(button_reset)
-        editMenu = menuBar.addMenu("&Edit")
-        editMenu.addAction(button_filters)
-
-        # toolbar = QtWidgets.QToolBar("My main toolbar")
-        # self.addToolBar(toolbar)
-        # toolbar.addAction(button_viewCDB)
-        # toolbar.addAction(button_save)
-        # toolbar.addAction(button_load)
-        # toolbar.addAction(button_filters)
-        # toolbar.addAction(button_reset)
-        # toolbar.addAction(button_about)
-
-        # status bar
-        self.statusBar = QtWidgets.QStatusBar()
-        self.setStatusBar(self.statusBar)
+        toolbar.addAction(button_reset)
 
         vf = ViewFrame(root=True)
-        vf.insertView(0,NodeEditorView())
+        vf.insertView(0,NodeView())
         self.setCentralWidget(vf)
 
     def showFilterBrowser(self):
@@ -87,15 +56,13 @@ class _Theater(QtWidgets.QMainWindow):
 
     def saveScript(self):
 
-        script = '''import pycinema
+        script = '''
+import pycinema
 import pycinema.filters
 import pycinema.theater
 import pycinema.theater.views
-
 '''
 
-        script += '# pycinema settings\n'
-        script += 'PYCINEMA = { \'VERSION\' : \'' + pycinema.__version__ + '\'}\n'
         script += '\n# layout\n'
         script += self.centralWidget().id+' = pycinema.theater.Theater.instance.centralWidget()\n'
         script += self.centralWidget().export()
@@ -140,13 +107,13 @@ import pycinema.theater.views
 
     def reset(self, no_views=False):
       Filter._processing = True
-      QtNodeEditorView.auto_layout = False
-      QtNodeEditorView.auto_connect = False
+      QtNodeView.auto_layout = False
+      QtNodeView.auto_connect = False
       for f in list(Filter._filters):
         f.delete()
       Filter._processing = False
-      QtNodeEditorView.auto_layout = True
-      QtNodeEditorView.auto_connect = True
+      QtNodeView.auto_layout = True
+      QtNodeView.auto_connect = True
 
       root = self.centralWidget()
 
@@ -268,37 +235,42 @@ ImageView_0.inputs.images.set(ImageAnnotation_0.outputs.images, False)
         self.setWindowTitle("Cinema:Explorer (" + path + ")")
         self.executeScript(script)
 
-    def quit(self, no_views=False):
-        QtWidgets.QApplication.quit()
-        return
-
-    def about(self, no_views=False):
-        msgBox = QtWidgets.QMessageBox.about(self, "About", "pycinema v" + pycinema.__version__);
-        return
-
     def executeScript(self, script):
-        QtNodeEditorView.auto_layout = False
-        QtNodeEditorView.auto_connect = False
+        QtNodeView.auto_layout = False
+        QtNodeView.auto_connect = False
 
-        try:
-          exec(script)
-        except:
-          return
+        exec(script)
 
         def call():
-          QtNodeEditorView.auto_layout = True
-          QtNodeEditorView.auto_connect = True
-          QtNodeEditorView.skip_layout_animation = True
-          QtNodeEditorView.computeLayout()
-          QtNodeEditorView.skip_layout_animation = False
+          QtNodeView.auto_layout = True
+          QtNodeView.auto_connect = True
+          QtNodeView.skip_layout_animation = True
+          QtNodeView.computeLayout()
+          QtNodeView.skip_layout_animation = False
+          for view in QtNodeView.instances:
+            view.fitInView()
           if self.centralWidget().count()<1:
-            self.centralWidget().insertView(0,NodeEditorView())
-
-          editors = self.centralWidget().findChildren(QtNodeEditorView)
-          for editor in editors:
-            editor.fitInView()
+            self.centralWidget().insertView(0,NodeView())
           return
         QtCore.QTimer.singleShot(0, lambda: call())
+
+        # namespace = {}
+        # lines = script.splitlines()
+        # def call(idx):
+        #     if len(lines)<=idx:
+        #         QtNodeView.auto_layout = True
+        #         QtNodeView.auto_connect = True
+        #         QtNodeView.skip_layout_animation = True
+        #         QtNodeView.computeLayout()
+        #         QtNodeView.skip_layout_animation = False
+        #         for view in QtNodeView.instances:
+        #           view.fitInView()
+        #         if self.centralWidget().count()<1:
+        #           self.centralWidget().insertView(0,NodeView())
+        #         return
+        #     exec(lines[idx], namespace)
+        #     QtCore.QTimer.singleShot(0, lambda: call(idx+1))
+        # QtCore.QTimer.singleShot(0, lambda: call(0))
 
     def loadScript(self, script_file_name=None):
         if not script_file_name:
@@ -309,7 +281,6 @@ ImageView_0.inputs.images.set(ImageAnnotation_0.outputs.images, False)
                 script = script_file.read()
                 script_file.close()
                 self.reset(True)
-                self.setWindowTitle("Cinema:Theater (" + script_file_name + ")")
                 self.executeScript(script)
             except:
                 return

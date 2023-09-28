@@ -14,7 +14,7 @@ class CinemaDatabaseWriter(Filter):
           inputs={
             'images': [],
             'path': '',
-            'ignore': ['^id','^camera'],
+            'ignore': ['id','camera']
           }
         );
 
@@ -70,7 +70,7 @@ class CinemaDatabaseWriter(Filter):
             image0 = images[0]
             header = [p for p,v in image0.meta.items() if not type(v) is numpy.ndarray or len(v)==1]
             ignore = self.inputs.ignore.get()
-            ignore.append('^FILE')
+            ignore.append('FILE')
             header = [p for p in header if not any([re.search(i, p, re.IGNORECASE) for i in ignore])]
             header.sort()
             csvData.append(header + ['FILE'])
@@ -85,7 +85,7 @@ class CinemaDatabaseWriter(Filter):
 
                 # delete all FILE meta data entries
                 out_image = image.copy()
-                for m in [m for m in list(out_image.meta.keys()) if re.search('^file', m, re.IGNORECASE)]:
+                for m in [m for m in list(out_image.meta.keys()) if re.search('file', m, re.IGNORECASE)]:
                     del out_image.meta[m]
 
                 # write image
